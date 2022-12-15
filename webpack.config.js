@@ -1,30 +1,20 @@
 const path = require('path');
 
 module.exports = {
-	entry: './src/index.ts',
-	devtool: false,
-	mode: "production",
-	module: {
-		rules: [
-			{
-				test: /\.tsx?$/,
-				use: 'ts-loader',
-				exclude: /node_modules/,
-			},
-		],
+	mode: "development",
+	devtool: "inline-source-map",
+	entry: "./src/index.ts",
+	output: {
+		filename: "script.js"
 	},
 	resolve: {
-		extensions: ['.tsx', '.ts', '.js'],
+		// Add `.ts` and `.tsx` as a resolvable extension.
+		extensions: [".ts", ".tsx", ".js"],
 	},
-	output: {
-		filename: 'script.js',
-		path: path.resolve(__dirname, 'dist'),
-	},
-	devServer: {
-		static: {
-			directory: path.join(__dirname, 'public'),
-		},
-		compress: true,
-		port: 9000,
-	},
+	module: {
+		rules: [
+			// all files with a `.ts`, `.cts`, `.mts` or `.tsx` extension will be handled by `ts-loader`
+			{ test: /\.([cm]?ts|tsx)$/, loader: "ts-loader" }
+		]
+	}
 };
