@@ -1,4 +1,5 @@
-import {Application, Assets, Container, Graphics, GraphicsGeometry, Sprite, Texture} from 'pixi.js';
+import {Application, Container, Graphics, Sprite, Text} from 'pixi.js';
+import {DropShadowFilter} from "@pixi/filter-drop-shadow";
 
 const app = new Application({
   background: '#000000',
@@ -9,14 +10,15 @@ const app = new Application({
 document.body.appendChild(app.view as HTMLCanvasElement);
 
 interface Button {
-  lengthOfButtons: number;
-  container: Graphics,
+}
+
+type Font = {
+    fontFamily: string,
+    fontSize: number,
+    fill: number,
 }
 
 class Button {
-  constructor() {
-  }
-
   createButton(
     buttonWidth: number = 100,
     buttonHeight: number = 60,
@@ -25,14 +27,24 @@ class Button {
     y: number = 0,
     round: number,
     img: string,
+    title: string,
+    font: Font,
   ) {
-    const container = new Graphics();
+    const container = new Container();
+    container.sortableChildren = true;
+    container.interactive = true;
+    container.cursor = 'pointer';
 
     let lengthOfButtons = 0;
     const len = buttonColor.length;
     const square = buttonWidth / len;
+    const { fontFamily,fontSize, fill} = font;
+    const maxSquares = Math.floor(buttonWidth / Math.max(50, buttonWidth / len));
+
+    console.log(maxSquares);
 
     container.x = x;
+    container.y = y;
 
     if (buttonWidth < 100) {
         buttonWidth = 100;
@@ -42,33 +54,167 @@ class Button {
         buttonHeight = 60;
     }
 
-    for (let i = 0; i <= len; i++) {
-      const rectangle = new Graphics();
+    const rectangle = new Graphics();
 
+    for (let i = 0; i < maxSquares; i++) {
       rectangle.beginFill(buttonColor[i], 1);
-      rectangle.drawRect(x + lengthOfButtons,y,buttonWidth / len, buttonHeight);
+      rectangle.drawRect(
+          x + lengthOfButtons,
+          y,
+          Math.max(50, buttonWidth / len),
+          buttonHeight
+      );
       rectangle.endFill();
 
       container.addChild(rectangle);
 
-      lengthOfButtons += buttonWidth / len;
+      lengthOfButtons += Math.max(50, buttonWidth / len);
     }
 
-    container.mask = new Graphics()
-          .beginFill(0xffffff)
-          .drawRoundedRect(x * 2, y, buttonWidth, buttonHeight, round)
-          .endFill();
+    let colorIsChanged = false;
+    let children: Graphics[] = [];
 
-    const sprite = Sprite.from(img);
+    // events
 
-    container.addChild(sprite);
+    container.on('pointertap', ()  => {
+        colorIsChanged = !colorIsChanged;
 
-    sprite.position.set((x + buttonWidth - 30) - (square / 2), y + ((buttonHeight - 60) / 2));
-    sprite.height = 60;
-    sprite.width = 60;
+        lengthOfButtons = 0;
+
+        const rect = new Graphics();
+
+        for (let i = 0; i < maxSquares; i++) {
+            const color = Math.floor(Math.random() * (16777215 + 1));
+
+            if (colorIsChanged) {
+                rect.beginFill(color, 1);
+                rect.drawRect(
+                    x + lengthOfButtons,
+                    y,
+                    Math.max(50, buttonWidth / len),
+                    buttonHeight
+                );
+                rect.endFill();
+                rect.zIndex = 0;
+
+                container.addChild(rect);
+                children.push(rect);
+
+                lengthOfButtons += Math.max(50, buttonWidth / len);
+            }
+
+            if (!colorIsChanged) {
+                container.removeChild(children[i]);
+                children = [];
+            }
+        }
+    });
+
+    container.on('mouseover', () => {
+        container.filters = [new DropShadowFilter({
+            color: 0xffffff,
+            distance: 10,
+        })];
+        container.transform.scale.set(1.05, 1.05);
+        container.mask = new Graphics()
+            .beginFill(0xffffff)
+            .drawRoundedRect(
+                x * 2 + (x * 0.05),
+                y * 2 + (y * 0.05),
+                buttonWidth + (buttonWidth * 0.05),
+                buttonHeight + (buttonHeight * 0.05),
+                round
+            )
+            .endFill();
+    });
+
+    container.on('mouseleave', () => {
+        container.filters = [];
+        container.transform.scale.set(1, 1);
+        container.mask = mask;
+    });
+
+    // adding mask
+
+    const mask = new Graphics()
+        .beginFill(0xffffff)
+        .drawRoundedRect(
+            x * 2,
+            y * 2,
+            buttonWidth,
+            buttonHeight,
+            round
+        )
+        .endFill();
+
+    container.mask = mask;
+
+    // adding text
+
+    const text = new AddText().ceateText(
+        title,
+        fontFamily,
+        fontSize,
+        fill,
+        container
+    );
+
+    text.position.set(x + (buttonWidth / 2), y + (buttonHeight / 2));
+
+    // adding icon
+
+    const sprite = new AddIcon().createIcon(img, container, buttonHeight);
+
+    sprite.position.set(
+        (x + buttonWidth - (buttonHeight - 20) / 2) - (square / 2),
+        y + ((buttonHeight - (buttonHeight - 20)) / 2)
+    );
+
+    // returning ready to use button
 
     return container;
   }
+}
+
+class AddText {
+    public ceateText(
+        title: string,
+        fontFamily: string,
+        fontSize: number,
+        fill: number,
+        container: Container,
+    ) {
+        const text = new Text(title, {
+            fontFamily,
+            fontSize,
+            fill,
+        });
+
+        container.addChild(text);
+
+        text.zIndex = 1;
+        text.anchor.set(0.5, 0.5);
+
+        return text;
+    };
+}
+
+class AddIcon {
+    createIcon(
+        img: string,
+        container: Container,
+        height: number,
+    ) {
+        const sprite = Sprite.from(img);
+
+        sprite.zIndex = 1;
+        sprite.height = height - 20;
+        sprite.width = height - 20;
+
+        container.addChild(sprite);
+
+        return sprite;
+    }
 }
 
 const button = new Button();
@@ -87,22 +233,34 @@ app.stage.addChild(button.createButton(
   40,
     20,
     './img/starbucks.png',
+    'starbucks',
+    {
+        fontFamily: 'Arial',
+        fontSize: 42,
+        fill: 0x000000,
+    }
 ));
 
 app.stage.addChild(button.createButton(
-  400,
-  80,
-  [
-      0x8AB363,
-    0xFFC410,
-    0xFF8C6B,
-    0xECDAC3,
-    0xE6EFEF,
-  ],
-  100,
-  140,
+    400,
+    80,
+    [
+        0x8AB363,
+        0xFFC410,
+        0xFF8C67,
+        0xECDCC3,
+        0xF0EFEF,
+    ],
+    100,
+    100,
     20,
-    './img/600px-Apple-logo.png',
+    './img/Instagram_logo_2016.svg.webp',
+    'instagram',
+    {
+        fontFamily: 'Arial',
+        fontSize: 42,
+        fill: 0x000fff,
+    }
 ));
 
 app.stage.addChild(button.createButton(
@@ -116,9 +274,15 @@ app.stage.addChild(button.createButton(
         0x93EFF7,
     ],
     100,
-    240,
+    160,
     20,
     './img/Twitter-logo.svg.png',
+    'twitter',
+    {
+        fontFamily: 'Arial',
+        fontSize: 42,
+        fill: 0x000000,
+    }
 ));
 
 app.stage.addChild(button.createButton(
@@ -132,31 +296,13 @@ app.stage.addChild(button.createButton(
         0xC6DDCD,
     ],
     100,
-    340,
+    220,
     20,
-    './img/Instagram_logo_2016.svg.webp',
+    './img/600px-Apple-logo.png',
+    'apple',
+    {
+        fontFamily: 'Arial',
+        fontSize: 42,
+        fill: 0x000000,
+    }
 ));
-
-// const call = () => {
-//   const container = new Container();
-//   const sprite = Sprite.from('https://s3-us-west-2.amazonaws.com/s.cdpn.io/693612/IaUrttj.png');
-//
-//   sprite.width = 512;
-//   sprite.height = 512;
-//
-//   // Adds a sprite as a child to this container. As a result, the sprite will be rendered whenever the container
-//   // is rendered.
-//   container.addChild(sprite);
-//
-//   // Blurs whatever is rendered by the container
-//
-//   // Only the contents within a circle at the center should be rendered onto the screen.
-//   container.mask = new Graphics()
-//       .beginFill(0xffffff)
-//       .drawCircle(sprite.width / 2, sprite.height / 2, Math.min(sprite.width, sprite.height) / 2)
-//       .endFill();
-//
-//   app.stage.addChild(container);
-// }
-//
-// call();
